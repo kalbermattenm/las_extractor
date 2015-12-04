@@ -6,7 +6,8 @@ import shapefile, csv, os, math, time
 import numpy as np
 from shapely.geometry import LineString
 import uuid
-from liblas import file
+
+from laspy import file
 from datetime import datetime
 
 try:
@@ -36,7 +37,6 @@ def generate_tile_list(line, bufferSizeMeter, outputDir, fileList, dataDir):
     for row in intersectResult:
         checkEmpty += 1
         tileList.append(dataDir + str(row.file.strip() + '.las'))
-
     return polygon, checkEmpty, tileList 
 
 # Read the numpy data and append them to json-serializable list  
@@ -105,24 +105,32 @@ def pointCloudExtractorV2(coordinates, bufferSizeMeter, outputDir, dataDir, json
         startIterateTile = datetime.now()
         for tile in tileList:
             cloud = file.File(tile, mode = 'r')
-            # iterate over cloud's points
-            for p in cloud:
-                # Needs enhancements...
-                if p.x <= max(seg['x1'] + bufferSizeMeter, seg['x2'] + bufferSizeMeter) \
-                and p.x >= min(seg['x1'] - bufferSizeMeter, seg['x2'] - bufferSizeMeter) \
-                and p.y <= max(seg['y1'] + bufferSizeMeter, seg['y2'] + bufferSizeMeter) \
-                and p.y >= min(seg['y1'] - bufferSizeMeter, seg['y2'] - bufferSizeMeter):
-                    xOB = p.x - seg['x1']
-                    yOB = p.y - seg['y1']
-                    hypo = math.sqrt(xOB * xOB + yOB * yOB)
-                    cosAlpha = (xOA * xOB + yOA * yOB)/(math.sqrt(xOA * xOA + yOA * yOA) * hypo)
-                    alpha = math.acos(cosAlpha)
-                    normalPointToLineDistance = math.sin(alpha) * hypo
-                    # Filter for normal distance smaller or equal to buffer size
-                    if normalPointToLineDistance <= bufferSizeMeter:
-                        exctractedPoints.append({'x': p.x, 'y': p.y, 'z': p.z, 'classification': p.classification})
-                        lineList = [p.x, p.y, p.z, cosAlpha, p.classification]
-                        table.append(lineList)
+
+
+            for x, y, z, classification in np.nditer((cloud.x, cloud.y, cloud.z, cloud.classification)):
+                x = x.item()
+                y = y.item()
+                if x <= max(seg['x1'] + bufferSizeMeter, seg['x2'] + bufferSizeMeter) \
+                    and x >= min(seg['x1'] - bufferSizeMeter, seg['x2'] - bufferSizeMeter) \
+                    and y <= max(seg['y1'] + bufferSizeMeter, seg['y2'] + bufferSizeMeter) \
+                    and y >= min(seg['y1'] - bufferSizeMeter, seg['y2'] - bufferSizeMeter):
+                        xOB = x - seg['x1']
+                        yOB = y - seg['y1']
+                        hypo = math.sqrt(xOB * xOB + yOB * yOB)
+                        cosAlpha = (xOA * xOB + yOA * yOB)/(math.sqrt(xOA * xOA + yOA * yOA) * hypo)
+                        if cosAlpha > 1:
+                            cosAlpha = 1
+
+                        alpha = math.acos(cosAlpha)
+                        normalPointToLineDistance = math.sin(alpha) * hypo
+                        # Filter for normal distance smaller or equal to buffer size
+                        if normalPointToLineDistance <= bufferSizeMeter:
+                            z = z.item()
+                            classification = classification.item()
+                            exctractedPoints.append({'x': x, 'y': y, 'z': z, 'classification': classification})
+                            lineList = [x, y, z, cosAlpha, classification]
+                            table.append(lineList)
+
             cloud.close()
 
         stopIterateTile = datetime.now()
