@@ -27,6 +27,7 @@ setup(
         'numpy',
         'pyyaml',
         'pip',
+        'numpy'
     ],
     packages=find_packages(exclude=['ez_setup']),
     include_package_data=True,
