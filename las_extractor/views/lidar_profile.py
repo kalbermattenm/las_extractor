@@ -51,7 +51,7 @@ def lidar_profile(request):
         debug_log = True
     else:
         debug_log = False
-    print debug_log
+
     if debug_log == True:
         log.warning("Request: "+str(uuid.uuid4()))
 
