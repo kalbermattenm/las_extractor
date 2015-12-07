@@ -21,6 +21,10 @@ from las_extractor.util.temp_file_manager import remove_old_files
 
 import sys
 
+import logging
+
+log = logging.getLogger(__name__)
+
 @view_config(route_name='lidar_profile', renderer='jsonp')
 def lidar_profile(request):
     """
@@ -40,8 +44,17 @@ def lidar_profile(request):
     
     
     startProcess = datetime.now()
-    perfLogStr = "Las extractor performance log \n"
-    perfLogStr += 'Request: ' + str(uuid.uuid4()) + '\n'
+
+    debug_log = request.registry.settings['debug_log']
+
+    if debug_log == 'True':
+        debug_log = True
+    else:
+        debug_log = False
+    print debug_log
+    if debug_log == True:
+        log.warning("Request: "+str(uuid.uuid4()))
+
     # Get resolution settings
     resolution = request.registry.settings['resolution']
 
@@ -61,8 +74,6 @@ def lidar_profile(request):
     # global variables
     classesList = []  
     jsonOutput=[]
-    
-    performanceLog = open(outputDir + 'PerformanceLog.txt', 'w+')
     
     # Create the csv output file for later shp/kml/csv file download (on user demand)
     csvOut = open(outputDir + outputCsv, 'w')
@@ -117,9 +128,9 @@ def lidar_profile(request):
         errorMsg += str(math.ceil(fullLine.length * 1000) / 1000) + 'm ' +_('long') +', '
         errorMsg +=  _('max allowed length is') +': ' + str(maxLineDistance) + 'm </p>'
         return {'Warning': errorMsg}
-    
+
     # ***Point cloud extractor, V2***
-    jsonOutput, zMin, zMax, checkEmpty, perfLogStr = pointCloudExtractorV2(geom.coordinates, bufferSizeMeter, outputDir, dataDir, jsonOutput, csvOut, classesList, classesNames, perfLogStr)
+    jsonOutput, zMin, zMax, checkEmpty = pointCloudExtractorV2(geom.coordinates, bufferSizeMeter, outputDir, dataDir, jsonOutput, csvOut, classesList, classesNames, debug_log)
     
     # If no tile is found in the area intersected by the segment, return error message
     if checkEmpty == 0:
@@ -134,10 +145,10 @@ def lidar_profile(request):
     # Close IO stream
     csvOut.close()
     endProcess = datetime.now()
-    perfLogStr += '*********TOTAL TIME***********\n'
-    perfLogStr += str(endProcess - startProcess) + '\n'
-    performanceLog.write(perfLogStr)
-    performanceLog.close()
+
+    if debug_log == True:
+        log.warning("TOTAL TIME: "+str(endProcess - startProcess))
+
     return {
         'profile': jsonOutput,
         'series':classesList,

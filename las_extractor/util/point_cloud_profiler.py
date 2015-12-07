@@ -10,6 +10,10 @@ import uuid
 from laspy import file
 from datetime import datetime
 
+import logging
+
+log = logging.getLogger(__name__)
+
 try:
     import osgeo.ogr as ogr
     import osgeo.osr as osr
@@ -63,7 +67,7 @@ def generate_json(profile, jsonOutput, csvOut, classesList, classesNames):
             'y': round(row[3]*100)/100
         })
     
-def pointCloudExtractorV2(coordinates, bufferSizeMeter, outputDir, dataDir, jsonOutput, csvOut, classesList, classesNames, perfLogStr):
+def pointCloudExtractorV2(coordinates, bufferSizeMeter, outputDir, dataDir, jsonOutput, csvOut, classesList, classesNames, debug_log):
     
     distanceFromOrigin = 0
     zMin = []
@@ -90,8 +94,9 @@ def pointCloudExtractorV2(coordinates, bufferSizeMeter, outputDir, dataDir, json
         beforeRequest = datetime.now()
         polygon, checkEmpty, tileList = generate_tile_list(segment, bufferSizeMeter, outputDir, fileList, dataDir)
         afterRequest = datetime.now()
-        perfLogStr += '***********PG REQUEST TIME*************\n'
-        perfLogStr += str(afterRequest - beforeRequest) + '\n'
+
+        if debug_log == True:
+            log.warning("PG REQUEST TIME: "+str(afterRequest - beforeRequest))
         
         # Point Cloud extractor V2
         seg = {'y1': xyStart[1], 'x1': xyStart[0], 'y2': xyEnd[1], 'x2': xyEnd[0]}
@@ -134,8 +139,10 @@ def pointCloudExtractorV2(coordinates, bufferSizeMeter, outputDir, dataDir, json
             cloud.close()
 
         stopIterateTile = datetime.now()
-        perfLogStr += '*********ITERATE OVER TILE AND POINTS TIME*************\n'
-        perfLogStr += str(stopIterateTile - startIterateTile) + '\n'
+
+        if debug_log == True:
+            log.warning("ITERATE OVER TILE AND POINTS TIME: "+str(stopIterateTile - startIterateTile))
+            log.warning('Found '+str(len(table))+" points")
         # Convert the list into numpy array for fast sorting
         data = np.array(table)
 
@@ -166,7 +173,7 @@ def pointCloudExtractorV2(coordinates, bufferSizeMeter, outputDir, dataDir, json
         # Read the numpy data and append them to json-serializable list
         generate_json(profile, jsonOutput, csvOut, classesList, classesNames)
         
-    return jsonOutput, zMin, zMax, checkEmpty, perfLogStr
+    return jsonOutput, zMin, zMax, checkEmpty
     
 # Export csv output file to google kml 3D
 def csv2kml(csvFile, markerUrl, outputKml, classesNames, kmlColors):
